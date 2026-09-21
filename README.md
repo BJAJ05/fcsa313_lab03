@@ -38,7 +38,7 @@ k6 хувилбар: `k6 v2.2.0 (commit/00a9a1b7f5, go1.26.5, linux/amd64)`
 | ------------------ | --------------------------- | ----------- | --------------------------------- |
 | Performance        | `/cart/add` p95 latency     | p95 < 13 мс | 20 VU, 1 минут                    |
 | Reliability        | `/pay` error rate           | < 5.5%      | 20 VU, 1 минут                    |
-| Availability       | Нийт хүсэлтийн success rate | ≥ 87.5%     | 2 минут, 10 секунд орчим downtime |
+| Availability       | Нийт хүсэлтийн success rate | > 87.5%     | 2 минут, 10 секунд орчим downtime |
 | Availability       | Recovery time               | ≤ 10 секунд | Сервер унасны дараа               |
 | Performance нэмэлт | `/report` p95 latency       | < 410 мс    | 20 VU, 1 минут                    |
 
@@ -53,8 +53,45 @@ k6 хувилбар: `k6 v2.2.0 (commit/00a9a1b7f5, go1.26.5, linux/amd64)`
 
 ## Хэмжилтийн үр дүн
 
-SLO-с бичсэн k6 threshold давсан туршилт:
+### SLO-с бичсэн k6 threshold давсан туршилт
+
+1 минутын турш 20 VU ачаалал өгсөн.
+
+| Үзүүлэлт              | Хэмжих нэгж      | Үр дүн | SLO   | Төлөв |
+| --------------------- | ---------------- | -----: | ----- | ----- |
+| Performance `/cart`   | Latency p95 (ms) |   1.79 | <13   | PASS  |
+| Reliability           | Error rate (%)   |   3.96 | <5.5  | PASS  |
+| Availability          | Success rate (%) |  98.67 | >87.5 | PASS  |
+| Performance `/report` | Latency p95 (ms) | 386.88 | <410  | PASS  |
 
 ![PASS](results/pass.png)
 
 [results/pass.txt](results/pass.txt)
+
+
+### Chaos туршилт
+
+2 минутын турш 20 VU ачаалал өгч байх үед серверийг хүчээр зогсоож, 10 секундийн дараа дахин асаасан.
+
+| Үзүүлэлт              | Хэмжих нэгж      | Үр дүн | SLO   | Төлөв |
+| --------------------- | ---------------- | -----: | ----- | ----- |
+| Performance `/cart`   | Latency p95 (ms) |   2.11 | <13   | PASS  |
+| Reliability `/pay`    | Error rate (%)   |  16.46 | <5.5  | FAIL  |
+| Availability          | Success rate (%) |  86.91 | >87.5 | FAIL  |
+| Performance `/report` | Latency p95 (ms) | 388.61 | <410  | PASS  |
+
+![alt text](results/chaos.png)
+
+[results/chaos.txt](results/chaos.txt)
+
+Chaos туршилтын үед `http_req_failed` нь хэвийн үеийн 1.63%-с 13.08% болж өсөж, `checks`-ийн амжилттай хувь 98.36%-с 86.91% болж буурсан. Нийт 5703 хүсэлтээс 4957 нь амжилттай байсан тул хүсэлтийн availability нь 86.91% болсон тул Availability SLO хангагдаагүй.
+
+Тестийн iteration бүрд `/cart/add`, `/report`, `/pay` хүсэлтүүдийн дараа `sleep(1)` байсан. Сервер хэвийн үед `/report` endpoint 200-400 мс хүлээлгэдэг боловч сервер унасан үед хүсэлтүүд connection refused гээд бараг шууд буцдаг. Иймээс унасан хугацааны нэг секундэд хэвийн үеийнхээс илүү олон хүсэлт үүсэж, хүсэлтийн алдааны хувь хугацааны тооцооллоос өндөр болсон.
+
+`/pay` endpoint-ийн error rate 16.46% болж 5.5%-ийн Reliability SLO-г зөрчсөн. Хэвийн үед endpoint-д зориуд суулгасан 5%-ийн алдаан дээр сервер унах үеийн алдаатай хүсэлт нэмэгдсэн тул энэ нь Reliability болон Availability SLO хоёуланд нь нөлөөлсөн.
+
+`/cart/add` endpoint-ийн p95 latency 2.11 мс, `/report` endpoint-ийн p95 latency 388.61 мс байсан тул Performance threshold-ууд PASS хэвээр үлдсэн. Сервер унасан үеийн хүсэлт маш хурдан буцдаг тул latency-ийн p95 хэмжүүр өсөөгүй.
+
+Иймээс энэ chaos туршилт нь Availability SLO-г батлаагүй, харин 87.5%-ийн амжилттай хүсэлтийн SLO-г зөрчсөнийг харуулсан. Reliability SLO мөн сервер унах үед зөрчигдсөн.
+
+Availability болон Reliability SLI-г тусгаарлахын тулд Availability-д системийн нийт хүсэлтийн амжилтыг, Reliability-д зөвхөн `/pay` endpoint-ийн алдааг тус тусад нь хэмжих хэрэгтэй.
