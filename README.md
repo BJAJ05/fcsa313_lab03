@@ -80,7 +80,7 @@ k6 хувилбар: `k6 v2.2.0 (commit/00a9a1b7f5, go1.26.5, linux/amd64)`
 | Availability          | Success rate (%) |  86.91 | >87.5 | FAIL  |
 | Performance `/report` | Latency p95 (ms) | 388.61 | <410  | PASS  |
 
-![alt text](results/chaos.png)
+![CHAOS](results/chaos.png)
 
 [results/chaos.txt](results/chaos.txt)
 
@@ -95,3 +95,32 @@ Chaos туршилтын үед `http_req_failed` нь хэвийн үеийн 1
 Иймээс энэ chaos туршилт нь Availability SLO-г батлаагүй, харин 87.5%-ийн амжилттай хүсэлтийн SLO-г зөрчсөнийг харуулсан. Reliability SLO мөн сервер унах үед зөрчигдсөн.
 
 Availability болон Reliability SLI-г тусгаарлахын тулд Availability-д системийн нийт хүсэлтийн амжилтыг, Reliability-д зөвхөн `/pay` endpoint-ийн алдааг тус тусад нь хэмжих хэрэгтэй.
+
+
+### Threshold зориуд эвдсэн туршилт
+
+`/report` endpoint-ийн threshold-ийг `p(95)<100 ms` болгон зориуд тестийг унагадаг.
+
+| Үзүүлэлт                  | Хэмжих нэгж          |     Үр дүн | SLO      | Төлөв    |
+| ------------------------- | -------------------- | ---------: | -------- | -------- |
+| Performance `/cart`       | Latency p95 (ms)     |       1.99 | <13      | PASS     |
+| Reliability `/pay`        | Error rate (%)       |       4.62 | <5.5     | PASS     |
+| Availability              | Success rate (%)     |      98.45 | >87.5    | PASS     |
+| **Performance `/report`** | **Latency p95 (ms)** | **390.45** | **<100** | **FAIL** |
+
+![FAIL](results/fail.png)
+
+[results/fail.txt](results/fail.txt)
+
+*`echo $?` комманд нь `tee results/fail/txt` буюу хамгийн сүүлийн коммандын exit status-ийг авч байсан тул k6-ийн exit status-ийг `${PIPESTATUS[0]}` ашиглан авсан.*
+
+k6 exit code нь 99 байсан. k6 хэрэгслийн эх кодод 99 кодийн нэр нь `ThresholdsHaveFailed`, тайлбар нь `нэг эсвэл олон threshold хангагдаагүй` гэж бичсэн байна. [Эх сурвалж (k6 GitHub)](https://github.com/grafana/k6/blob/master/errext/exitcodes/codes.go)
+
+
+## Дүгнэлт
+
+Энэ лабораторийн ажлаар локал серверт зориулан бичсэн сценариогоосоо SLO тодорхойлж, босго шалгууруудаа k6 threshold хэлбэрт оруулан туршиж, хэмжилт авсан. Performance сценариод хурдан endpoint-ийн baseline p95-ийг хэмжиж, түүний үр дүнг үндэслэн босго тоог p95 <13 мс гэж сонгосон. Reliability сценариод хийсэн baseline error rate хэмжээд, 10% хэлбэлзэлтэй гэж үзээд <5.5% босгыг сонгосон. Мөн `/report` endpoint-ийн хариу өгөх хугацааны онолын p95-ыг бодож, түүн дээр 20 мс headroom нэмж 410 мс гэсэн нэмэлт SLO тодорхойлсон.
+
+Availability сценарийн SLO-г бодохдоо сервер унах хугацаа болох 10 секунд дээр сервер сэргээх хугацаа болон нэмэлт error budget болгож 5 секунд нэмж тодорхойлсон. Үүнийг chaos туршилтаар серверээ 10 секунд зогсоож туршихад хүсэлтийн 86.91% нь амжилттай болж, SLO-г хангагдаагүй. Серверийн уналтын улмаас Reliability SLO бас унасан, гэхдээ хүсэлтийн хариу хурдан хэвээр байсан тул Performance SLO унаагүй.
+
+`/report` endpoint-ийн threshold-ийг зориуд `p(95)<100` болгон өөрчлөн туршихад k6 threshold failure-ийг зөь илрүүлж, exit code 99-ийг буцаасан нь SLO-ийн шалгалтыг CI орчинд ашиглах боломжтойг харуулсан.
